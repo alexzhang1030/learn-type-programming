@@ -143,3 +143,238 @@ type CapitalizeStr<S extends string> = S extends `${infer First}${infer O}`
 type CapitalizeStrTest = CapitalizeStr<'hello'> // Hello
 ```
 
+这就是字符串类型的重新构造：**从已有的字符串类型中提取出一些部分字符串，经过一系列变换，构造成新的字符串类型。**
+
+### 2.2 CamelCase
+
+再来实现从 snake_case 到 camelCase 的转换，这个例子我们就可以用到我们刚写的 `camelCase` 类型
+
+```ts
+type camelCase<S extends string> =
+  S extends `${infer Left}_${infer Middle}_${infer Right}`
+    ? `${Left}${CapitalizeStr<Middle>}${CapitalizeStr<Right>}`
+    : never
+```
+
+测试一下
+
+```ts
+type camelCaseTest = camelCase<'hi_hi_hi'> // hiHiHi
+```
+
+### 2.3 DropSubStr
+
+我们还可以删除某个字符串中的子串
+
+```ts
+type DropSubStr<
+  S extends string,
+  Sub extends string
+> = S extends `${infer O}${Sub}` ? DropSubStr<O, Sub> : S
+```
+
+测试一下
+
+```ts
+type DropSubStrTest = DropSubStr<'hello~~~', '~'> // hello
+```
+
+## 3. 函数类型的重新构造
+
+### 3.1 AppendArgument
+
+```ts
+type AppendArgument<
+  Func extends (...args: any[]) => unknown,
+  Arg
+> = Func extends (...args: infer Args) => infer ReturnType
+  ? (...args: [...Args, Arg]) => ReturnType
+  : never
+```
+
+测试一下
+
+```ts
+// (args0: string, args1: number) => number }
+type AppendArgumentTest = AppendArgument<(name: string) => number, number>
+```
+
+## 4. 索引类型的重新构造
+
+索引类型是聚合多个元素的类型，比如这就是一个索引类型：
+
+```ts
+type obj = {
+  name: string;
+  age: number;
+  gender: boolean;
+}
+```
+
+索引类型可以添加修饰符 `readonly`（只读）、`?`（可选）:
+
+```ts
+type obj = {
+  readonly name: string;
+  age?: number;
+  gender: boolean;
+}
+```
+
+对它的修改和构造新类型涉及到了映射类型的语法：
+
+```ts
+type Mapping<Obj extends object> = { 
+    [Key in keyof Obj]: Obj[Key]
+}
+```
+
+### 4.1 Mapping
+
+映射的过程中可以对 value 做下修改，比如：
+
+```ts
+type MappingTriple<O extends Record<string, unknown>> = {
+  [K in keyof O]: [O[K], O[K], O[K]]
+}
+```
+
+测试一下
+
+```ts
+// { name: [1, 1, 1], age: [2, 2, 2] }
+type MappingTripleTest = MappingTriple<{ name: 1; age: 2 }> 
+```
+
+### 4.2 UpperCaseKey
+
+```ts
+type UpperCaseKey<O extends Record<string, unknown>> = {
+  [K in keyof O as Uppercase<K & string>]: O[K]
+}
+```
+
+测试一下
+
+```ts
+// { NAME: string }
+type UpperCaseKeyTest = UpperCaseKey<{ name: string }>
+```
+
+### 4.3 Record
+
+TS 内建了类型 `Record` 用于创建索引类型。
+
+```ts
+type Record<K extends string | number | symbol, T> = { [P in K]: T }
+```
+
+例如：
+
+```ts
+type Obj = Record<string, Record<string, unkonwn>>
+
+const obj: Obj = {
+    foo: {
+        bar: "baz"
+    }
+}
+```
+
+### 4.4 ToReadonly
+
+索引类型的索引可以添加 readonly 的修饰符，代表只读。
+
+那我们就可以实现给索引类型添加 readonly 修饰的高级类型：
+
+```ts
+type ToReadonly<T> = {
+  readonly [K in keyof T]: T[K]
+}
+```
+
+测试一下
+
+```ts
+// { readonly name: string }
+type ToReadonlyTest = ToReadonly<{ name: string }>
+```
+
+### 4.5 ToPartial
+
+```ts
+type ToPartial<T> = {
+  [K in keyof T]?: T[K]
+}
+```
+
+测试一下
+
+```ts
+// { name?: string | undefined }
+type ToPartialTest = ToPartial<{ name: string }>
+```
+
+### 4.6 ToMutable
+
+既然可以加上 readonly，还可以去掉
+
+```ts
+type ToMutable<T> = {
+  -readonly [K in keyof T]: T[K]
+}
+```
+
+测试一下
+
+```ts
+// { name: string }
+type ToMutableTest = ToMutable<ToReadonly<{ name: string }>>
+```
+
+### 4.7 ToRequired
+
+同理，也可以去掉可选修饰符
+
+```ts
+type ToRequired<T> = {
+  [K in keyof T]-?: T[K]
+}
+```
+
+测试一下
+
+```ts
+// { name: string }
+type ToRequiredTest = ToRequired<ToPartial<{ name: string }>>
+```
+
+### 4.8 FilterByValueType
+
+可以在构造新索引类型的时候根据值的类型做下过滤：
+
+```ts
+type FilterByValueType<Obj extends Record<string, any>, ValueType> = {
+  [Key in keyof Obj as ValueType extends Obj[Key] ? Key : never]: Obj[Key]
+}
+```
+
+测试一下
+
+```ts
+// { name: string }
+type FilterByValueTypeTest = FilterByValueType<
+  { name: string; age: number },
+  string
+>
+```
+
+## 总结
+
+TypeScript 支持 type、infer、类型参数来保存任意类型，相当于变量的作用。
+
+但其实也不能叫变量，因为它们是不可变的。**想要变化就需要重新构造新的类型，并且可以在构造新类型的过程中对原类型做一些过滤和变换。**
+
+数组、字符串、函数、索引类型等都可以用这种方式对原类型做变换产生新的类型。其中索引类型有专门的语法叫做映射类型，对索引做修改的 as 叫做重映射。
+
+提取和构造这俩是相辅相成的，学完了`模式匹配做提取`，`重新构造做变换` 这两个套路之后，很多类型体操就有思路了。
