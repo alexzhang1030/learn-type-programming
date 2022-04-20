@@ -170,3 +170,132 @@ type ReplaceAll<
 type ReplaceAllTest = ReplaceAll<'hello ? nihao ?', '?', 'world'>
 ```
 
+### 4.2 StringToUnion
+
+我们甚至可以将 string 转为 union
+
+举个例子：
+
+```ts
+type String2Union<S extends string> = S extends `${infer F}${infer O}`
+  ? F | String2Union<O>
+  : never
+```
+
+测试一下
+
+```ts
+// "a" | "b" | "c" | "d"
+type String2UnionTest = String2Union<'abcd'>
+```
+
+### 4.3 ReverseStr
+
+类型参数 Str 为待处理的字符串。类型参数 Result 为构造出的字符，默认值是空串。
+
+通过模式匹配提取第一个字符到 infer 声明的局部变量 First，其余字符放到 Rest。
+
+用 First 和之前的 Result 构造成新的字符串，把 First 放到前面，**因为递归是从左到右处理，那么不断往前插就是把右边的放到了左边，完成了反转的效果。**
+
+直到模式匹配不满足，就处理完了所有的字符。
+
+这样就完成了字符串的反转：
+
+```ts
+type ReverseStr<
+  Str extends string,
+  Result extends string = ''
+> = Str extends `${infer F}${infer Rest}`
+  ? ReverseStr<Rest, `${F}${Result}`>
+  : Result
+```
+
+测试一下
+
+```ts
+// cba
+type ReverseStrTest = ReverseStr<'abc'>
+```
+
+## 5. 对象类型的递归
+
+### 5.1 DeepReadonly
+
+```ts
+type DeepReadonly<Obj extends Record<string, any>> = {
+  readonly [K in keyof Obj]: Obj[K] extends object
+    ? Obj[K] extends Function
+      ? Obj[K]
+      : DeepReadonly<Obj[K]>
+    : Obj[K]
+}
+```
+
+测试一下
+
+```ts
+type DeepReadonlyTest = DeepReadonly<{
+  name: {
+    foo: {
+      bar: 1
+    }
+  }
+}>
+```
+
+但是这样，我们如果鼠标移动到 DeepReadonlyTest 上，是不会进行计算的，也就是我们无法看到深层次的属性修饰符，只会这样
+
+```ts
+// 计算出的类型
+type DeepReadonlyTest = {
+    readonly c: () => void;
+    readonly name: DeepReadonly<{
+        a: 1;
+        c: () => void;
+        foo: {
+            bar: 1;
+        };
+    }>;
+}
+```
+
+此时我们需要让其 extends never 或 extends any 来让其进行计算
+
+```ts
+type DeepReadonly<Obj extends Record<string, any>> = Obj extends any
+  ? {
+      readonly [K in keyof Obj]: Obj[K] extends object
+        ? Obj[K] extends Function
+          ? Obj[K]
+          : DeepReadonly<Obj[K]>
+        : Obj[K]
+    }
+  : never
+```
+
+这次我们再看看计算出的类型
+
+```ts
+type DeepReadonlyTest = {
+    readonly c: () => void;
+    readonly name: {
+        readonly a: 1;
+        readonly c: () => void;
+        readonly foo: {
+            readonly bar: 1;
+        };
+    };
+}
+```
+
+而且写 `Obj extends any` 还有额外的好处就是能处理联合类型，这个可以看套路五，会有解释。
+
+## 总结
+
+递归是把问题分解成一个个子问题，通过解决一个个子问题来解决整个问题。形式是不断的调用函数自身，直到满足结束条件。
+
+在 TypeScript 类型系统中的高级类型也同样支持递归，**在类型体操中，遇到数量不确定的问题，要条件反射的想到递归。** 比如数组长度不确定、字符串长度不确定、索引类型层数不确定等。
+
+如果说学完了提取和构造可以做一些基础的类型体操，那再加上递归就可以实现各种复杂类型体操了。
+
+(其实这节的 IsEqual 判断是不完善的，套路六里面会讲原因)

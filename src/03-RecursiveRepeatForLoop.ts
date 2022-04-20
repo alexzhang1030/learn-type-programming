@@ -62,3 +62,40 @@ type ReplaceAll<
 type ReplaceTest = Replace<'hello ?', '?', 'world'> // hello world
 // hello world nihao world
 type ReplaceAllTest = ReplaceAll<'hello ? nihao ?', '?', 'world'>
+// 3.2 StringToUnion
+type String2Union<S extends string> = S extends `${infer F}${infer O}`
+  ? F | String2Union<O>
+  : never
+// "a" | "b" | "c" | "d"
+type String2UnionTest = String2Union<'abcd'>
+// 3.3 ReverseStr
+type ReverseStr<
+  Str extends string,
+  Result extends string = ''
+> = Str extends `${infer F}${infer Rest}`
+  ? ReverseStr<Rest, `${F}${Result}`>
+  : Result
+// cba
+type ReverseStrTest = ReverseStr<'abc'>
+
+// 4. 对象类型的递归
+// 4.1 DeepReadonly
+type DeepReadonly<Obj extends Record<string, any>> = Obj extends any
+  ? {
+      readonly [K in keyof Obj]: Obj[K] extends object
+        ? Obj[K] extends Function
+          ? Obj[K]
+          : DeepReadonly<Obj[K]>
+        : Obj[K]
+    }
+  : never
+type DeepReadonlyTest = DeepReadonly<{
+  c: () => void
+  name: {
+    a: 1
+    c: () => void
+    foo: {
+      bar: 1
+    }
+  }
+}>
