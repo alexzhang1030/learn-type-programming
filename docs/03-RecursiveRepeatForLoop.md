@@ -223,10 +223,11 @@ type ReverseStrTest = ReverseStr<'abc'>
 
 ```ts
 type DeepReadonly<Obj extends Record<string, any>> = {
-  readonly [K in keyof Obj]: Obj[K] extends object
-    ? Obj[K] extends Function
-      ? Obj[K]
-      : DeepReadonly<Obj[K]>
+    readonly [K in keyof Obj]: Obj[K] extends Record<
+        string | symbol | number,
+        unknown
+    >
+    ? DeepReadonly<Obj[K]>
     : Obj[K]
 }
 ```
@@ -264,10 +265,11 @@ type DeepReadonlyTest = {
 ```ts
 type DeepReadonly<Obj extends Record<string, any>> = Obj extends any
   ? {
-      readonly [K in keyof Obj]: Obj[K] extends object
-        ? Obj[K] extends Function
-          ? Obj[K]
-          : DeepReadonly<Obj[K]>
+      readonly [K in keyof Obj]: Obj[K] extends Record<
+        string | symbol | number,
+        unknown
+      >
+        ? DeepReadonly<Obj[K]>
         : Obj[K]
     }
   : never
