@@ -151,5 +151,89 @@ type DivideTest = Divide<9, 3>
 ### 2.1 记录字符串的长度
 
 ```ts
+type StrLen<
+  S extends string,
+  CountArr extends unknown[] = []
+> = S extends `${infer F}${infer Rest}`
+  ? StrLen<Rest, [unknown, ...CountArr]>
+  : CountArr['length']
 ```
+
+原理就是，递归每次截取一个字符，并向 `CountArr` 中添加一个 `unknown`，最终 `Str` 消费完毕，就可以获取到 `CountArr["length"]`
+
+### 2.2 GreaterThan
+
+泛型 Num1 和 Num2，判断前一个数字是否比后一个数字大
+
+```ts
+type GreaterThan<
+  Num1 extends number,
+  Num2 extends number,
+  CountArr extends unknown[] = []
+> = Num1 extends Num2
+  ? false
+  : CountArr['length'] extends Num2
+  ? true
+  : CountArr['length'] extends Num1
+  ? false
+  : GreaterThan<Num1, Num2, [unknown, ...CountArr]>
+```
+
+原理就是，首先判断 Num1 是否等于 Num2，如果不等，开始进行递归向 CountArr 中放 `unknown`，如果 `CountArr["length"]` 首先到了 Num2，那么就表示 Num1 > Num2，返回 true，反之如果先到了 Num1，那就表示 Num1 < Num2，那么就返回 false
+
+```ts
+// 测试一下
+// true
+type GreaterThanTest = GreaterThan<4, 3>
+```
+
+### 2.3 Fibonacci
+
+提到数值运算，就不得不提到斐波那契数列了。
+
+*F*(0) = 1，*F*(1) = 1, *F*(n) = *F*(n - 1) + *F*(n - 2)（*n* ≥ 2，*n* ∈ N*）
+
+也就是递归的加法，在 TS 中使用构造数组的方式来解决
+
+```ts
+type FibonacciLoop<
+  PrevArr extends unknown[],
+  CurrentArr extends unknown[],
+  IndexArr extends unknown[] = [],
+  Num extends number = 1
+  > = IndexArr['length'] extends Num
+  ? CurrentArr['length']
+  : FibonacciLoop<
+    CurrentArr,
+    [...PrevArr, ...CurrentArr],
+    [...IndexArr, unknown],
+    Num
+  >
+type Fibonacci<Num extends number> = FibonacciLoop<[1], [], [], Num>
+```
+
+测试一下
+
+```ts
+// 1 1 2 3 5 8 13 21 -> 21 
+type FibonacciTest = Fibonacci<8>
+```
+
+原理就是
+
+- 第一次 1，因为 `prevArr["length"] = 1`
+- 第二次是 1，因为 `prevArr["length"] = 0`, `curArr["length"] = 1`
+- 第三次是 2，因为 `prevArr["length"] = lastCurArr["length"] = 1`， `curArr["length"] = prev + lastCurr = 2`
+- 第四次是 3，因为 `prevArr["length"] = lastCurArr["length"] = 2` ，`curArr["length"] = prev + lastCurr = 1 + 2 = 3`
+- 现在我们就知道了，依次会往下加
+
+## 总结
+
+TypeScript 类型系统没有加减乘除运算符，所以我们**通过数组类型的构造和提取，然后取长度的方式来实现数值运算**。
+
+我们通过构造和提取数组类型实现了加减乘除，也实现了各种计数逻辑。
+
+用数组长度做计数这一点是 TypeScript 类型体操中最麻烦的一个点，也是最容易让新手困惑的一个点。
+
+
 
